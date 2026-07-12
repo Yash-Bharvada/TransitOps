@@ -3,20 +3,25 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { StatusBadge } from '@/components/status-badge';
 import { TablePagination } from '@/components/table-pagination';
-import { Plus, Wrench, Fuel, Calendar, Loader2 } from 'lucide-react';
+import { Plus, Wrench, Fuel, Calendar, Loader2, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import { useDashboard } from '@/components/dashboard-context';
+import { useAuth } from '@/components/auth-context';
+import { ProtectedRoute } from '@/components/protected-route';
 
 export default function VehiclesPage() {
+  const { user } = useAuth();
+  const canEdit = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'driver';
+
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -129,6 +134,7 @@ export default function VehiclesPage() {
   }
 
   return (
+    <ProtectedRoute requiredRoles={['admin', 'manager', 'driver', 'viewer']}>
     <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-background to-background/95">
       <div className="space-y-6">
         {/* Header */}
@@ -137,12 +143,13 @@ export default function VehiclesPage() {
             <h1 className="text-3xl font-bold text-foreground">Vehicles</h1>
             <p className="text-sm text-muted-foreground mt-1">Manage and monitor your fleet vehicles</p>
           </div>
-          <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-            <DialogTrigger render={<Button />}>
-              <Plus className="size-4 mr-2" />
-              Add Vehicle
-            </DialogTrigger>
-            <DialogContent>
+          {canEdit && (
+            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+              <DialogTrigger className={buttonVariants({ variant: 'default' })}>
+                <Plus className="size-4 mr-2" />
+                Add Vehicle
+              </DialogTrigger>
+              <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add New Vehicle</DialogTitle>
                 <DialogDescription>Register a new vehicle to your fleet</DialogDescription>
@@ -159,7 +166,7 @@ export default function VehiclesPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Type</label>
-                    <Select value={formData.type} onValueChange={v => setFormData({...formData, type: v})}>
+                    <Select value={formData.type} onValueChange={(v) => setFormData({...formData, type: v as string})}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Truck">Truck</SelectItem>
@@ -171,7 +178,7 @@ export default function VehiclesPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Region</label>
-                    <Select value={formData.region} onValueChange={v => setFormData({...formData, region: v})}>
+                    <Select value={formData.region} onValueChange={(v) => setFormData({...formData, region: v as string})}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="North">North</SelectItem>
@@ -202,6 +209,7 @@ export default function VehiclesPage() {
               </form>
             </DialogContent>
           </Dialog>
+          )}
         </div>
 
         {/* Statistics */}
@@ -251,7 +259,7 @@ export default function VehiclesPage() {
                 }}
                 className="flex-1"
               />
-              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}>
+              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as string); setCurrentPage(1); }}>
                 <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
@@ -284,29 +292,70 @@ export default function VehiclesPage() {
                       <TableCell className="font-medium">{vehicle.registration}</TableCell>
                       <TableCell className="text-sm">{vehicle.name}</TableCell>
                       <TableCell>
-                        <StatusBadge status={vehicle.status?.toLowerCase().replace(' ', '_')} />
+                        <StatusBadge status={vehicle.status || 'Unknown'} />
                       </TableCell>
                       <TableCell>{vehicle.odometer_km}</TableCell>
                       <TableCell>{vehicle.type}</TableCell>
                       <TableCell>{vehicle.region}</TableCell>
                       <TableCell>
-                        <ConfirmDialog
-                          trigger={
-                            <Button variant="ghost" size="sm" onClick={() => setSelectedVehicle(vehicle)}>
-                              <Wrench className="size-4" />
-                            </Button>
-                          }
-                          title="Schedule Maintenance"
-                          description={`Schedule maintenance for ${vehicle.registration}?`}
-                          onConfirm={() => { }}
-                          confirmText="Schedule"
-                        />
+                        {canEdit && (
+                          <ConfirmDialog
+                            trigger={
+                              <Button variant="ghost" size="sm" onClick={() => setSelectedVehicle(vehicle)}>
+                                <Wrench className="size-4" />
+                              </Button>
+                            }
+                            title="Schedule Maintenance"
+                            description={`Schedule maintenance for ${vehicle.registration}?`}
+                            onConfirm={async () => {
+                              try {
+                                const payload = {
+                                  id: crypto.randomUUID(),
+                                  vehicle_id: vehicle.id,
+                                  description: 'Routine Maintenance',
+                                  cost: 0,
+                                  start_date: new Date().toISOString().split('T')[0],
+                                  status: 'Pending'
+                                };
+                                await api.post('/maintenance/', payload);
+                                toast.success('Maintenance scheduled');
+                                fetchVehicles();
+                                refreshDashboard();
+                              } catch (e: any) {
+                                toast.error('Failed to schedule: ' + (e.response?.data?.detail || e.message));
+                              }
+                            }}
+                            confirmText="Schedule"
+                          />
+                        )}
+                        {canEdit && (
+                          <ConfirmDialog
+                            trigger={
+                              <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10">
+                                <Trash2 className="size-4" />
+                              </Button>
+                            }
+                            title="Delete Vehicle"
+                            description={`Are you sure you want to delete ${vehicle.registration}?`}
+                            onConfirm={async () => {
+                              try {
+                                await api.delete(`/vehicles/${vehicle.id}`);
+                                toast.success('Vehicle deleted');
+                                fetchVehicles();
+                                refreshDashboard();
+                              } catch (e: any) {
+                                toast.error('Failed to delete: ' + (e.response?.data?.detail || e.message));
+                              }
+                            }}
+                            confirmText="Delete"
+                          />
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
                   {paginatedVehicles.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
                         No vehicles found.
                       </TableCell>
                     </TableRow>
@@ -329,5 +378,6 @@ export default function VehiclesPage() {
         </Card>
       </div>
     </main>
+    </ProtectedRoute>
   );
 }

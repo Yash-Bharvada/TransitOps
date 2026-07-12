@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,12 +11,18 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { TablePagination } from '@/components/table-pagination';
 import { PremiumButton } from '@/components/premium-button';
 import { premiumToast } from '@/components/premium-toast';
-import { Plus, MapPin, Clock, Fuel, Loader2 } from 'lucide-react';
+import { Plus, MapPin, Clock, Fuel, Loader2, Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import { useAuth } from '@/components/auth-context';
+import { ProtectedRoute } from '@/components/protected-route';
 import { useDashboard } from '@/components/dashboard-context';
 
 export default function TripsPage() {
+  const { user } = useAuth();
+  const canEdit = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'driver';
+
   const [trips, setTrips] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -125,8 +131,7 @@ export default function TripsPage() {
       
       let matchesStatus = true;
       if (statusFilter !== 'all') {
-        const backendStatus = t.status?.toLowerCase().replace(' ', '_');
-        matchesStatus = backendStatus === statusFilter;
+        matchesStatus = t.status === statusFilter;
       }
       return matchesSearch && matchesStatus;
     });
@@ -163,19 +168,22 @@ export default function TripsPage() {
   }
 
   return (
+    <ProtectedRoute requiredRoles={['admin', 'manager', 'driver', 'viewer']}>
     <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-background to-background/95">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Trips</h1>
-            <p className="text-sm text-muted-foreground mt-1">Track and manage vehicle trips</p>
+            <p className="text-sm text-muted-foreground mt-1">Manage dispatch and track active trips</p>
           </div>
-          <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-            <DialogTrigger render={<PremiumButton variant="success" icon={<Plus className="size-4" />} />}>
-              New Trip
-            </DialogTrigger>
-            <DialogContent>
+          {canEdit && (
+            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+              <DialogTrigger className={buttonVariants({ variant: 'default' })}>
+                <Plus className="size-4 mr-2" />
+                Dispatch Trip
+              </DialogTrigger>
+              <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create New Trip</DialogTitle>
                 <DialogDescription>Schedule a new trip for your fleet</DialogDescription>
@@ -184,7 +192,7 @@ export default function TripsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Vehicle</label>
-                    <Select value={formData.vehicle_id} onValueChange={v => setFormData({...formData, vehicle_id: v})} required>
+                    <Select value={formData.vehicle_id} onValueChange={(v) => setFormData({...formData, vehicle_id: v as string})}>
                       <SelectTrigger><SelectValue placeholder="Select Vehicle" /></SelectTrigger>
                       <SelectContent>
                         {availableVehicles.map(v => (
@@ -195,7 +203,7 @@ export default function TripsPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Driver</label>
-                    <Select value={formData.driver_id} onValueChange={v => setFormData({...formData, driver_id: v})} required>
+                    <Select value={formData.driver_id} onValueChange={(v) => setFormData({...formData, driver_id: v as string})}>
                       <SelectTrigger><SelectValue placeholder="Select Driver" /></SelectTrigger>
                       <SelectContent>
                         {availableDrivers.map(d => (
@@ -227,11 +235,12 @@ export default function TripsPage() {
                 </div>
                 <div className="flex gap-2 justify-end pt-4">
                   <Button type="button" variant="outline" onClick={() => setOpenDialog(false)}>Cancel</Button>
-                  <Button type="submit" disabled={submitting}>{submitting ? 'Adding...' : 'Create Trip'}</Button>
+                  <Button type="submit" disabled={submitting}>{submitting ? 'Dispatching...' : 'Dispatch'}</Button>
                 </div>
               </form>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          )}
         </div>
 
         {/* Statistics */}
@@ -281,7 +290,7 @@ export default function TripsPage() {
                 }}
                 className="flex-1"
               />
-              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}>
+              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as string); setCurrentPage(1); }}>
                 <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
@@ -306,6 +315,7 @@ export default function TripsPage() {
                     <TableHead>Distance</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -330,11 +340,35 @@ export default function TripsPage() {
                           {trip.status}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        {canEdit && (
+                          <ConfirmDialog
+                            trigger={
+                              <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10">
+                                <Trash2 className="size-4" />
+                              </Button>
+                            }
+                            title="Delete Trip"
+                            description="Are you sure you want to delete this trip?"
+                            onConfirm={async () => {
+                              try {
+                                await api.delete(`/trips/${trip.id}`);
+                                toast.success('Trip deleted');
+                                fetchData();
+                                refreshDashboard();
+                              } catch (e: any) {
+                                toast.error('Failed to delete: ' + (e.response?.data?.detail || e.message));
+                              }
+                            }}
+                            confirmText="Delete"
+                          />
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                   {paginatedTrips.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
                         No trips found.
                       </TableCell>
                     </TableRow>
@@ -357,5 +391,6 @@ export default function TripsPage() {
         </Card>
       </div>
     </main>
+    </ProtectedRoute>
   );
 }

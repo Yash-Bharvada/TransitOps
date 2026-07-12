@@ -9,15 +9,18 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 
 interface ConfirmDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   title: string
   description: string
   confirmLabel?: string
+  confirmText?: string
   onConfirm: () => void
+  trigger?: React.ReactNode
 }
 
 export function ConfirmDialog({
@@ -25,11 +28,14 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = 'Confirm',
+  confirmLabel,
+  confirmText,
   onConfirm,
+  trigger,
 }: ConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
+      {trigger && <AlertDialogTrigger render={trigger as any} />}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
@@ -41,7 +47,7 @@ export function ConfirmDialog({
             className="bg-destructive text-white hover:bg-destructive/90"
             onClick={onConfirm}
           >
-            {confirmLabel}
+            {confirmLabel || confirmText || 'Confirm'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

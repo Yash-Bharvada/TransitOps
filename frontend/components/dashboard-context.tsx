@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '@/lib/api';
+import { useAuth } from '@/components/auth-context';
 
 type DashboardData = any;
 
@@ -16,8 +17,10 @@ const DashboardContext = createContext<DashboardContextType | undefined>(undefin
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { token, loading: authLoading } = useAuth();
 
   const refreshDashboard = async () => {
+    if (!token) return;
     try {
       setLoading(true);
       const res = await api.get('/reports/dashboard');
@@ -30,8 +33,14 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    refreshDashboard();
-  }, []);
+    if (!authLoading) {
+      if (token) {
+        refreshDashboard();
+      } else {
+        setLoading(false);
+      }
+    }
+  }, [token, authLoading]);
 
   return (
     <DashboardContext.Provider value={{ dashboardData, loading, refreshDashboard }}>

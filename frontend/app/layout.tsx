@@ -44,6 +44,7 @@ export const viewport: Viewport = {
 }
 
 import { DashboardProvider } from '@/components/dashboard-context'
+import { AuthProvider } from '@/components/auth-context'
 
 export default function RootLayout({
   children,
@@ -54,16 +55,18 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased bg-gradient-dark`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
-          <DashboardProvider>
-            <SidebarProvider>
-              <div className="flex h-screen overflow-hidden">
-                <UltraPremiumSidebar />
-                <SidebarContentWrapper>
-                  {children}
-                </SidebarContentWrapper>
-              </div>
-            </SidebarProvider>
-          </DashboardProvider>
+          <AuthProvider>
+            <DashboardProvider>
+              <SidebarProvider>
+                <div className="flex h-screen overflow-hidden">
+                  <UltraPremiumSidebar />
+                  <SidebarContentWrapper>
+                    {children}
+                  </SidebarContentWrapper>
+                </div>
+              </SidebarProvider>
+            </DashboardProvider>
+          </AuthProvider>
           <Toaster position="top-right" />
         </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}

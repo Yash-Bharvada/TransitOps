@@ -3,12 +3,19 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Legend,
   ResponsiveContainer, ScatterChart, Scatter, Tooltip
 } from 'recharts';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 import { Download, TrendingUp, AlertTriangle } from 'lucide-react';
 
 const performanceData = [
@@ -54,6 +61,65 @@ export default function ReportsPage() {
   const [dateRange, setDateRange] = useState('month');
   const [reportType, setReportType] = useState('performance');
 
+  const handleExportExcel = () => {
+    try {
+      let csvContent = "data:text/csv;charset=utf-8,";
+      
+      // Cost Breakdown
+      csvContent += "OPERATIONAL COST BREAKDOWN\n";
+      csvContent += "Category,Value (INR)\n";
+      costBreakdown.forEach(item => {
+        csvContent += `${item.name},${item.value}\n`;
+      });
+
+      // Driver Performance
+      csvContent += "\nDRIVER PERFORMANCE LEADERBOARD\n";
+      csvContent += "Driver Name,Trips,Rating,Safety Score (%)\n";
+      driverPerformance.forEach(d => {
+        csvContent += `${d.name},${d.trips},${d.rating},${d.safety}\n`;
+      });
+
+      // Performance Trends
+      csvContent += "\nFLEET PERFORMANCE TRENDS\n";
+      csvContent += "Date,Efficiency (km/l),Safety (%),Utilization (%)\n";
+      performanceData.forEach(p => {
+        csvContent += `${p.date},${p.efficiency},${p.safety},${p.utilization}\n`;
+      });
+
+      // Vehicle Metrics
+      csvContent += "\nVEHICLE EFFICIENCY COMPARISON\n";
+      csvContent += "Vehicle,Efficiency (km/l),Operational Cost,Status\n";
+      vehicleMetrics.forEach(v => {
+        csvContent += `${v.vehicle},${v.efficiency},${v.cost},${v.status}\n`;
+      });
+
+      // Route Analysis
+      csvContent += "\nROUTE PERFORMANCE ANALYSIS\n";
+      csvContent += "Route,Total Trips,Distance (km),Avg Time\n";
+      routeAnalysis.forEach(r => {
+        csvContent += `${r.route},${r.trips},${r.distance},${r.avgTime}\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "transitops_detailed_report.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success('Detailed Excel (CSV) export downloaded!');
+    } catch (err) {
+      toast.error('Failed to export data');
+    }
+  };
+
+  const handleExportPDF = () => {
+    toast.success('Opening PDF print dialog...');
+    setTimeout(() => {
+      window.print();
+    }, 500);
+  };
+
   return (
     <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-background to-background/95">
       <div className="space-y-6">
@@ -63,10 +129,16 @@ export default function ReportsPage() {
             <h1 className="text-3xl font-bold text-foreground">Reports & Analytics</h1>
             <p className="text-sm text-muted-foreground mt-1">Comprehensive fleet performance insights</p>
           </div>
-          <Button>
-            <Download className="size-4" />
-            Export Report
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger className={buttonVariants({ variant: "default" })}>
+              <Download className="size-4 mr-2" />
+              Export Report
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportPDF}>Export as PDF</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportExcel}>Export as Excel (CSV)</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Filter Controls */}
@@ -121,7 +193,7 @@ export default function ReportsPage() {
           <Card className="border-border/50">
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Total Cost</p>
-              <p className="text-2xl font-bold mt-2">$90k</p>
+              <p className="text-2xl font-bold mt-2">₹90k</p>
               <p className="text-xs text-red-600 dark:text-red-400 mt-2">+12% vs last period</p>
             </CardContent>
           </Card>
@@ -168,10 +240,11 @@ export default function ReportsPage() {
                       data={costBreakdown}
                       cx="50%"
                       cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
                       labelLine={false}
-                      label={({ name, value }) => `${name}: $${(value / 1000).toFixed(0)}k`}
-                      outerRadius={80}
-                      fill="#8884d8"
+                      label={({ name, value }) => `${name}: ₹${(value / 1000).toFixed(0)}k`}
                       dataKey="value"
                     >
                       {costBreakdown.map((entry, index) => (
