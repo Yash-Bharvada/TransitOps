@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useSidebar } from '@/components/sidebar-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { useDashboard } from '@/components/dashboard-context'
 
 interface NavItem {
   title: string
@@ -74,6 +75,10 @@ const badgeColorMap = {
 export function UltraPremiumSidebar() {
   const pathname = usePathname()
   const { isOpen, isMobile, mounted, toggle, close } = useSidebar()
+  const { dashboardData } = useDashboard()
+
+  const activeTrips = dashboardData ? ((dashboardData.trips?.pending || 0) + (dashboardData.trips?.dispatched || 0)) : null;
+  const pendingMaintenance = dashboardData?.maintenance?.pending;
 
   // Use stable SSR-safe defaults before mount to prevent hydration mismatch
   const effectiveIsOpen = mounted ? isOpen : true
@@ -159,6 +164,10 @@ export function UltraPremiumSidebar() {
                 {group.items.map((item) => {
                   const isActive = pathname === item.href
                   const Icon = item.icon
+                  
+                  let displayBadge = item.badge;
+                  if (item.title === 'Trips' && activeTrips !== null) displayBadge = activeTrips > 0 ? activeTrips : undefined;
+                  if (item.title === 'Maintenance' && pendingMaintenance !== undefined) displayBadge = pendingMaintenance > 0 ? pendingMaintenance : undefined;
 
                   return (
                     <Link
@@ -207,7 +216,7 @@ export function UltraPremiumSidebar() {
                       )}
 
                       {/* Badge */}
-                      {item.badge && effectiveIsOpen && (
+                      {displayBadge && effectiveIsOpen && (
                         <div
                           className={cn(
                             'flex-shrink-0 px-2 py-1 rounded-full text-xs font-bold whitespace-nowrap',
@@ -215,7 +224,7 @@ export function UltraPremiumSidebar() {
                             'animate-fade-in-scale'
                           )}
                         >
-                          {item.badge}
+                          {displayBadge}
                         </div>
                       )}
                     </Link>

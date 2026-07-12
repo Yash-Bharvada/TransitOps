@@ -43,6 +43,8 @@ export const viewport: Viewport = {
   ],
 }
 
+import { DashboardProvider } from '@/components/dashboard-context'
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -52,14 +54,16 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased bg-gradient-dark`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
-          <SidebarProvider>
-            <div className="flex h-screen overflow-hidden">
-              <UltraPremiumSidebar />
-              <SidebarContentWrapper>
-                {children}
-              </SidebarContentWrapper>
-            </div>
-          </SidebarProvider>
+          <DashboardProvider>
+            <SidebarProvider>
+              <div className="flex h-screen overflow-hidden">
+                <UltraPremiumSidebar />
+                <SidebarContentWrapper>
+                  {children}
+                </SidebarContentWrapper>
+              </div>
+            </SidebarProvider>
+          </DashboardProvider>
           <Toaster position="top-right" />
         </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
