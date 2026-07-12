@@ -52,11 +52,9 @@ export default function DriversPage() {
             <p className="text-sm text-muted-foreground mt-1">Manage driver information and performance</p>
           </div>
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="size-4" />
-                Add Driver
-              </Button>
+            <DialogTrigger render={<Button />}>
+              <Plus className="size-4" />
+              Add Driver
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>

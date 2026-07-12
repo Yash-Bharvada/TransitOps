@@ -49,11 +49,9 @@ export default function VehiclesPage() {
             <p className="text-sm text-muted-foreground mt-1">Manage and monitor your fleet vehicles</p>
           </div>
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="size-4" />
-                Add Vehicle
-              </Button>
+            <DialogTrigger render={<Button />}>
+              <Plus className="size-4" />
+              Add Vehicle
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>

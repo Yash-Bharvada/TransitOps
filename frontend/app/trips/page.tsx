@@ -81,10 +81,8 @@ export default function TripsPage() {
             <p className="text-sm text-muted-foreground mt-1">Track and manage vehicle trips</p>
           </div>
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-            <DialogTrigger asChild>
-              <PremiumButton variant="success" icon={<Plus className="size-4" />}>
-                New Trip
-              </PremiumButton>
+            <DialogTrigger render={<PremiumButton variant="success" icon={<Plus className="size-4" />} />}>
+              New Trip
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>

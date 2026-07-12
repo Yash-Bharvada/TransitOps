@@ -1,6 +1,5 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -17,6 +16,8 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useSidebar } from '@/components/sidebar-provider'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 interface NavItem {
   title: string
@@ -72,38 +73,28 @@ const badgeColorMap = {
 
 export function UltraPremiumSidebar() {
   const pathname = usePathname()
-  const [isOpen, setIsOpen] = useState(true)
-  const [isMobile, setIsMobile] = useState(false)
+  const { isOpen, isMobile, mounted, toggle, close } = useSidebar()
 
-  useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth < 768
-      setIsMobile(mobile)
-      if (mobile) setIsOpen(false)
-    }
-
-    handleResize()
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
-  const toggleSidebar = () => setIsOpen(!isOpen)
+  // Use stable SSR-safe defaults before mount to prevent hydration mismatch
+  const effectiveIsOpen = mounted ? isOpen : true
+  const effectiveIsMobile = mounted ? isMobile : false
 
   return (
     <>
       {/* Mobile Toggle Button */}
       <button
-        onClick={toggleSidebar}
+        onClick={toggle}
         className="fixed top-4 left-4 z-40 md:hidden p-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-all duration-300 shadow-premium-lg"
+        suppressHydrationWarning
       >
-        {isOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+        {effectiveIsOpen ? <X className="size-5" /> : <Menu className="size-5" />}
       </button>
 
       {/* Sidebar Overlay (Mobile) */}
-      {isOpen && isMobile && (
+      {effectiveIsOpen && effectiveIsMobile && (
         <div
           className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm md:hidden"
-          onClick={() => setIsOpen(false)}
+          onClick={close}
         />
       )}
 
@@ -112,17 +103,17 @@ export function UltraPremiumSidebar() {
         className={cn(
           `
             fixed left-0 top-0 h-screen z-40
-            bg-sidebar-dark border-r border-sidebar-border
+            bg-background border-r border-border
             transition-all duration-500 ease-out
             flex flex-col
             shadow-premium-2xl
           `,
-          isOpen ? 'w-72' : 'w-20',
-          isMobile && !isOpen && '-translate-x-full'
+          effectiveIsOpen ? 'w-72' : 'w-20',
+          effectiveIsMobile && !effectiveIsOpen && '-translate-x-full'
         )}
       >
         {/* Header */}
-        <div className="p-6 border-b border-sidebar-border flex items-center justify-between group">
+        <div className="p-6 border-b border-border flex items-center justify-between group">
           <Link href="/" className="flex items-center gap-3 flex-1 min-w-0">
             {/* Logo */}
             <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 via-accent-500 to-secondary-500 flex items-center justify-center shadow-glow-primary group-hover:shadow-glow-accent transition-all duration-300">
@@ -130,35 +121,35 @@ export function UltraPremiumSidebar() {
             </div>
 
             {/* Brand Text */}
-            {isOpen && (
+            {effectiveIsOpen && (
               <div className="min-w-0 animate-fade-in-scale">
-                <p className="text-white font-bold text-lg truncate">TransitOps</p>
-                <p className="text-primary-200 text-xs truncate">Fleet Management</p>
+                <p className="text-foreground font-bold text-lg truncate">TransitOps</p>
+                <p className="text-muted-foreground text-xs truncate">Fleet Management</p>
               </div>
             )}
           </Link>
 
           {/* Toggle Button */}
           <button
-            onClick={toggleSidebar}
-            className="hidden md:flex p-2 rounded-lg hover:bg-white/10 transition-all duration-300 text-primary-200 hover:text-white ml-2"
+            onClick={toggle}
+            className="hidden md:flex p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-300 text-muted-foreground hover:text-foreground ml-2"
           >
             <ChevronRight
               className={cn(
                 'size-5 transition-transform duration-500',
-                !isOpen && 'rotate-180'
+                !effectiveIsOpen && 'rotate-180'
               )}
             />
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-6">
+        <nav className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-6">
           {navGroups.map((group) => (
             <div key={group.title}>
               {/* Group Label */}
-              {isOpen && (
-                <p className="text-primary-300/60 text-xs font-bold tracking-widest mb-3 px-3 animate-fade-in-scale">
+              {effectiveIsOpen && (
+                <p className="text-muted-foreground text-xs font-bold tracking-widest mb-3 px-3 animate-fade-in-scale">
                   {group.title}
                 </p>
               )}
@@ -173,7 +164,7 @@ export function UltraPremiumSidebar() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      onClick={() => isMobile && setIsOpen(false)}
+                      onClick={() => effectiveIsMobile && close()}
                       className={cn(
                         `
                           relative flex items-center gap-3 px-3 py-3 rounded-lg
@@ -182,14 +173,14 @@ export function UltraPremiumSidebar() {
                         `,
                         isActive
                           ? `
-                            bg-gradient-to-r from-primary-500/20 to-accent-500/20
-                            text-white
+                            bg-gradient-to-r from-primary-500/10 to-accent-500/10 dark:from-primary-500/20 dark:to-accent-500/20
+                            text-primary-700 dark:text-white
                             border-l-2 border-primary-500
-                            shadow-glow-primary
+                            shadow-sm dark:shadow-glow-primary
                           `
                           : `
-                            text-primary-200 hover:text-white
-                            hover:bg-white/5
+                            text-muted-foreground hover:text-foreground
+                            hover:bg-black/5 dark:hover:bg-white/5
                           `
                       )}
                     >
@@ -209,14 +200,14 @@ export function UltraPremiumSidebar() {
                       </div>
 
                       {/* Label */}
-                      {isOpen && (
+                      {effectiveIsOpen && (
                         <span className="flex-1 text-sm font-medium truncate animate-fade-in-scale">
                           {item.title}
                         </span>
                       )}
 
                       {/* Badge */}
-                      {item.badge && isOpen && (
+                      {item.badge && effectiveIsOpen && (
                         <div
                           className={cn(
                             'flex-shrink-0 px-2 py-1 rounded-full text-xs font-bold whitespace-nowrap',
@@ -236,17 +227,19 @@ export function UltraPremiumSidebar() {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-sidebar-border">
-          {isOpen ? (
+        <div className="p-4 border-t border-border space-y-4">
+          <ThemeToggle isOpen={effectiveIsOpen} />
+          
+          {effectiveIsOpen ? (
             <div className="animate-fade-in-scale">
-              <p className="text-primary-300/60 text-xs font-bold tracking-widest mb-2">
+              <p className="text-muted-foreground text-xs font-bold tracking-widest mb-2">
                 STATUS
               </p>
-              <div className="flex items-center gap-2 text-primary-200 text-xs">
+              <div className="flex items-center gap-2 text-foreground text-xs">
                 <div className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
                 <span>System Operational</span>
               </div>
-              <p className="text-primary-300/40 text-xs mt-2">v2.4.1</p>
+              <p className="text-muted-foreground/60 text-xs mt-2">v2.4.1</p>
             </div>
           ) : (
             <div className="flex justify-center">
@@ -255,16 +248,6 @@ export function UltraPremiumSidebar() {
           )}
         </div>
       </aside>
-
-      {/* Main Content Wrapper */}
-      <div
-        className={cn(
-          'transition-all duration-500 ease-out',
-          isOpen ? 'md:ml-72' : 'md:ml-20'
-        )}
-      >
-        {/* Content goes here */}
-      </div>
     </>
   )
 }
