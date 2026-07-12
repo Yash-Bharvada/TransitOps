@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 
 import { UltraPremiumSidebar } from '@/components/ultra-premium-sidebar'
+import { SidebarProvider, SidebarContentWrapper } from '@/components/sidebar-provider'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from 'sonner'
 
@@ -51,8 +52,14 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased bg-gradient-dark`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
-          <UltraPremiumSidebar />
-          <main className="p-4 md:p-6">{children}</main>
+          <SidebarProvider>
+            <div className="flex h-screen overflow-hidden">
+              <UltraPremiumSidebar />
+              <SidebarContentWrapper>
+                {children}
+              </SidebarContentWrapper>
+            </div>
+          </SidebarProvider>
           <Toaster position="top-right" />
         </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}

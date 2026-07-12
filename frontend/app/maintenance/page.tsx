@@ -83,11 +83,9 @@ export default function MaintenancePage() {
             <p className="text-sm text-muted-foreground mt-1">Schedule and track vehicle maintenance</p>
           </div>
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="size-4" />
-                Schedule Maintenance
-              </Button>
+            <DialogTrigger render={<Button />}>
+              <Plus className="size-4" />
+              Schedule Maintenance
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>

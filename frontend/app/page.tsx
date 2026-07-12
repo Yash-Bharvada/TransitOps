@@ -117,12 +117,12 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <ComposedChart data={weeklyData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                    <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" tickLine={false} />
-                    <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" tickLine={false} />
-                    <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" tickLine={false} />
+                    <XAxis dataKey="date" stroke="#888888" tickLine={false} />
+                    <YAxis yAxisId="left" stroke="#888888" tickLine={false} />
+                    <YAxis yAxisId="right" orientation="right" stroke="#888888" tickLine={false} />
                     <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
                     <Legend />
                     <Bar yAxisId="left" dataKey="trips" fill="#3b82f6" radius={[8, 8, 0, 0]} name="Trips" />
@@ -141,7 +141,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <PieChart>
                     <Pie
                       data={statusDistribution}

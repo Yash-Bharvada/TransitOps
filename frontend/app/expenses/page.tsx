@@ -78,11 +78,9 @@ export default function ExpensesPage() {
             <p className="text-sm text-muted-foreground mt-1">Track fuel consumption and operational costs</p>
           </div>
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="size-4" />
-                Log Expense
-              </Button>
+            <DialogTrigger render={<Button />}>
+              <Plus className="size-4" />
+              Log Expense
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -183,8 +181,8 @@ export default function ExpensesPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" />
-                  <YAxis stroke="hsl(var(--muted-foreground))" />
+                  <XAxis dataKey="month" stroke="#888888" />
+                  <YAxis stroke="#888888" />
                   <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
                   <Bar dataKey="fuel" fill="#3b82f6" radius={[8, 8, 0, 0]} />
                   <Bar dataKey="maintenance" fill="#f59e0b" radius={[8, 8, 0, 0]} />
