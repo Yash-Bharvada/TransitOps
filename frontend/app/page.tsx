@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,18 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend, ComposedChart, Line } from 'recharts';
-import { vehicles, trips } from '@/lib/data';
 import { StatusBadge } from '@/components/status-badge';
 import { TablePagination } from '@/components/table-pagination';
 import { PremiumKPICard } from '@/components/premium-kpi-card';
-import { TrendingUp, Fuel, AlertTriangle, MapPin, Activity } from 'lucide-react';
-
-const fleetMetrics = [
-  { label: 'Active Vehicles', value: 12, icon: MapPin, trend: '+2.5%' },
-  { label: 'Total Trips', value: 148, icon: TrendingUp, trend: '+12.3%' },
-  { label: 'Fuel Efficiency', value: '8.4 km/l', icon: Fuel, trend: '+1.2%' },
-  { label: 'Maintenance Due', value: 3, icon: AlertTriangle, trend: '-3' },
-];
+import { TrendingUp, Fuel, AlertTriangle, MapPin, Activity, Loader2 } from 'lucide-react';
+import api from '@/lib/api';
 
 const weeklyData = [
   { date: 'Mon', trips: 42, fuel: 156 },
@@ -31,26 +24,47 @@ const weeklyData = [
   { date: 'Sun', trips: 29, fuel: 98 },
 ];
 
-const statusDistribution = [
-  { name: 'Active', value: 12, color: '#10b981' },
-  { name: 'Idle', value: 4, color: '#f59e0b' },
-  { name: 'Maintenance', value: 3, color: '#ef4444' },
-];
-
 export default function Dashboard() {
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [dashRes, vehRes] = await Promise.all([
+        api.get('/reports/dashboard'),
+        api.get('/vehicles/?limit=100')
+      ]);
+      setDashboardData(dashRes.data.data);
+      setVehicles(vehRes.data.data);
+    } catch (error) {
+      console.error('Failed to fetch dashboard data', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredVehicles = useMemo(() => {
     return vehicles.filter(v => {
-      const matchesSearch = v.registration.toLowerCase().includes(search.toLowerCase()) ||
-        v.driver.toLowerCase().includes(search.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || v.status === statusFilter;
+      const matchesSearch = (v.registration?.toLowerCase() || '').includes(search.toLowerCase());
+      let matchesStatus = true;
+      if (statusFilter !== 'all') {
+        const backendStatus = v.status?.toLowerCase().replace(' ', '_');
+        matchesStatus = backendStatus === statusFilter;
+      }
       return matchesSearch && matchesStatus;
     });
-  }, [search, statusFilter]);
+  }, [vehicles, search, statusFilter]);
 
   const paginatedVehicles = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -58,6 +72,35 @@ export default function Dashboard() {
   }, [filteredVehicles, currentPage]);
 
   const totalPages = Math.ceil(filteredVehicles.length / itemsPerPage);
+
+  const statusDistribution = useMemo(() => {
+    if (!vehicles.length) return [];
+    const counts = vehicles.reduce((acc, v) => {
+      acc[v.status] = (acc[v.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const colors: Record<string, string> = {
+      'Available': '#10b981',
+      'On Trip': '#3b82f6',
+      'In Shop': '#ef4444',
+      'Out of Service': '#f59e0b'
+    };
+    
+    return Object.entries(counts).map(([name, value]) => ({
+      name,
+      value,
+      color: colors[name] || '#888888'
+    }));
+  }, [vehicles]);
+
+  if (loading) {
+    return (
+      <main className="flex-1 flex items-center justify-center overflow-auto p-6 bg-gradient-to-br from-background to-background/95">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </main>
+    );
+  }
 
   return (
     <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-background to-background/95">
@@ -73,43 +116,41 @@ export default function Dashboard() {
         {/* Premium KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <PremiumKPICard
-            label="Active Vehicles"
-            value={24}
-            trend={{ value: 2.5, direction: 'up' }}
+            label="Total Vehicles"
+            value={dashboardData?.vehicles?.total || 0}
+            trend={{ value: 5.2, direction: 'up' }}
             icon={MapPin}
             color="blue"
-            sparklineData={[12, 14, 18, 22, 24]}
+            sparklineData={[12, 14, 18, 22, dashboardData?.vehicles?.total || 0]}
           />
           <PremiumKPICard
             label="Total Trips"
-            value={148}
+            value={dashboardData?.trips?.total || 0}
             trend={{ value: 12.3, direction: 'up' }}
             icon={Activity}
             color="green"
-            sparklineData={[85, 95, 110, 130, 148]}
+            sparklineData={[85, 95, 110, 130, dashboardData?.trips?.total || 0]}
           />
           <PremiumKPICard
-            label="Fuel Efficiency"
-            value="8.4"
-            unit="km/l"
-            trend={{ value: 1.2, direction: 'up' }}
-            icon={Fuel}
+            label="Total Drivers"
+            value={dashboardData?.drivers?.total || 0}
+            trend={{ value: 2.1, direction: 'up' }}
+            icon={MapPin}
             color="orange"
-            sparklineData={[7.8, 8.0, 8.1, 8.3, 8.4]}
+            sparklineData={[15, 15, 16, 17, dashboardData?.drivers?.total || 0]}
           />
           <PremiumKPICard
-            label="Maintenance Due"
-            value={3}
-            trend={{ value: 3, direction: 'down' }}
+            label="Maintenance Needs"
+            value={dashboardData?.maintenance?.pending || 0}
+            trend={{ value: 1, direction: 'down' }}
             icon={AlertTriangle}
             color="red"
-            sparklineData={[6, 5, 4, 4, 3]}
+            sparklineData={[4, 5, 4, 3, dashboardData?.maintenance?.pending || 0]}
           />
         </div>
 
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Weekly Trips Chart */}
           <Card className="lg:col-span-2 border-border/50">
             <CardHeader>
               <CardTitle>Weekly Activity</CardTitle>
@@ -133,34 +174,37 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Fleet Status Pie */}
           <Card className="border-border/50">
             <CardHeader>
               <CardTitle>Fleet Status</CardTitle>
-              <CardDescription>Vehicle distribution</CardDescription>
+              <CardDescription>Current vehicle distribution</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                  <PieChart>
-                    <Pie
-                      data={statusDistribution}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={2}
-                      dataKey="value"
-                      labelLine={false}
-                      label={({ name, value }) => `${name}: ${value}`}
-                    >
-                      {statusDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
-                  </PieChart>
-                </ResponsiveContainer>
+                {statusDistribution.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                    <PieChart>
+                      <Pie
+                        data={statusDistribution}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={2}
+                        dataKey="value"
+                        labelLine={false}
+                        label={({ name, value }) => `${name}: ${value}`}
+                      >
+                        {statusDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">No data available</div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -177,7 +221,7 @@ export default function Dashboard() {
             </div>
             <div className="flex gap-4 flex-col sm:flex-row">
               <Input
-                placeholder="Search by registration or driver..."
+                placeholder="Search by registration..."
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
@@ -191,9 +235,9 @@ export default function Dashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="idle">Idle</SelectItem>
-                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="available">Available</SelectItem>
+                  <SelectItem value="on_trip">On Trip</SelectItem>
+                  <SelectItem value="in_shop">In Shop</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -204,52 +248,43 @@ export default function Dashboard() {
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead>Registration</TableHead>
-                    <TableHead>Driver</TableHead>
+                    <TableHead>Model</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Fuel Level</TableHead>
-                    <TableHead>Maintenance</TableHead>
-                    <TableHead>Last Trip</TableHead>
+                    <TableHead>Region</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedVehicles.map((vehicle) => (
                     <TableRow key={vehicle.id} className="hover:bg-muted/50">
                       <TableCell className="font-medium">{vehicle.registration}</TableCell>
-                      <TableCell>{vehicle.driver}</TableCell>
+                      <TableCell>{vehicle.name}</TableCell>
                       <TableCell>
-                        <StatusBadge status={vehicle.status} />
+                        <StatusBadge status={vehicle.status?.toLowerCase().replace(' ', '_')} />
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary rounded-full"
-                              style={{ width: `${vehicle.fuelLevel}%` }}
-                            />
-                          </div>
-                          <span className="text-sm text-muted-foreground">{vehicle.fuelLevel}%</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={vehicle.maintenanceStatus === 'due' ? 'destructive' : 'secondary'}>
-                          {vehicle.maintenanceStatus}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{vehicle.lastTrip}</TableCell>
+                      <TableCell>{vehicle.region}</TableCell>
                     </TableRow>
                   ))}
+                  {paginatedVehicles.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                        No vehicles found.
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>
-            <div className="mt-4">
-              <TablePagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-                totalItems={filteredVehicles.length}
-                itemsPerPage={itemsPerPage}
-              />
-            </div>
+            {totalPages > 1 && (
+              <div className="mt-4">
+                <TablePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalItems={filteredVehicles.length}
+                  itemsPerPage={itemsPerPage}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

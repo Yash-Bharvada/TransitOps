@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,48 +8,84 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { TablePagination } from '@/components/table-pagination';
-import { Plus, TrendingUp, DollarSign, Fuel } from 'lucide-react';
-
-const expenses = [
-  { id: 1, vehicle: 'ABC-1234', type: 'Fuel', amount: 450, date: '2024-01-18', liters: 45, costPerLiter: 10 },
-  { id: 2, vehicle: 'XYZ-5678', type: 'Fuel', amount: 380, date: '2024-01-17', liters: 38, costPerLiter: 10 },
-  { id: 3, vehicle: 'MNO-9012', type: 'Maintenance', amount: 600, date: '2024-01-16', liters: 0, costPerLiter: 0 },
-  { id: 4, vehicle: 'DEF-3456', type: 'Fuel', amount: 520, date: '2024-01-15', liters: 52, costPerLiter: 10 },
-  { id: 5, vehicle: 'GHI-7890', type: 'Toll', amount: 250, date: '2024-01-14', liters: 0, costPerLiter: 0 },
-  { id: 6, vehicle: 'JKL-2345', type: 'Fuel', amount: 420, date: '2024-01-13', liters: 42, costPerLiter: 10 },
-];
-
-const monthlyData = [
-  { month: 'Jan', fuel: 4200, maintenance: 1200, tolls: 450 },
-  { month: 'Feb', fuel: 4500, maintenance: 800, tolls: 520 },
-  { month: 'Mar', fuel: 3800, maintenance: 1500, tolls: 380 },
-  { month: 'Apr', fuel: 4100, maintenance: 900, tolls: 410 },
-  { month: 'May', fuel: 4600, maintenance: 1100, tolls: 520 },
-  { month: 'Jun', fuel: 4300, maintenance: 1400, tolls: 490 },
-];
+import { Plus, TrendingUp, DollarSign, Fuel, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import api from '@/lib/api';
+import { useDashboard } from '@/components/dashboard-context';
 
 export default function ExpensesPage() {
+  const [combinedExpenses, setCombinedExpenses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [openDialog, setOpenDialog] = useState(false);
+  
+  const [availableVehicles, setAvailableVehicles] = useState<any[]>([]);
   const [formData, setFormData] = useState({
-    vehicle: '',
-    type: '',
-    amount: '',
-    liters: '',
+    vehicle_id: '',
+    type: 'Fuel',
+    amount: 0,
+    liters: 0,
+    odometer_km: 0,
+    description: '',
+    date: new Date().toISOString().split('T')[0]
   });
+  const [submitting, setSubmitting] = useState(false);
+  const { refreshDashboard } = useDashboard();
+  
   const itemsPerPage = 10;
 
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [expRes, fuelRes] = await Promise.all([
+        api.get('/expenses/?limit=100'),
+        api.get('/fuel-logs/?limit=100')
+      ]);
+      
+      const normalizedExpenses = expRes.data.data.map((e: any) => ({
+        id: `exp-${e.id}`,
+        vehicle_id: e.associated_with,
+        type: e.type,
+        amount: e.amount,
+        date: e.date,
+        liters: 0
+      }));
+
+      const normalizedFuel = fuelRes.data.data.map((f: any) => ({
+        id: `fuel-${f.id}`,
+        vehicle_id: f.vehicle_id,
+        type: 'Fuel',
+        amount: f.cost,
+        date: f.date,
+        liters: f.liters
+      }));
+
+      const all = [...normalizedExpenses, ...normalizedFuel];
+      all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      setCombinedExpenses(all);
+    } catch (error) {
+      console.error('Failed to fetch expenses/fuel data', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredExpenses = useMemo(() => {
-    return expenses.filter(e => {
-      const matchesSearch = e.vehicle.toLowerCase().includes(search.toLowerCase());
-      const matchesType = typeFilter === 'all' || e.type === typeFilter;
+    return combinedExpenses.filter(e => {
+      const matchesSearch = (e.vehicle_id?.toLowerCase() || '').includes(search.toLowerCase());
+      const matchesType = typeFilter === 'all' || e.type?.toLowerCase() === typeFilter.toLowerCase();
       return matchesSearch && matchesType;
     });
-  }, [search, typeFilter]);
+  }, [combinedExpenses, search, typeFilter]);
 
   const paginatedExpenses = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -58,15 +94,85 @@ export default function ExpensesPage() {
 
   const totalPages = Math.ceil(filteredExpenses.length / itemsPerPage);
 
-  const handleSubmit = () => {
-    setFormData({ vehicle: '', type: '', amount: '', liters: '' });
-    setOpenDialog(false);
+  const fetchDropdownData = async () => {
+    try {
+      const res = await api.get('/vehicles/?limit=100');
+      setAvailableVehicles(res.data.data);
+    } catch (e) {
+      console.error('Failed to fetch vehicles', e);
+    }
   };
 
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const fuelExpenses = expenses.filter(e => e.type === 'Fuel').reduce((sum, e) => sum + e.amount, 0);
-  const maintenanceExpenses = expenses.filter(e => e.type === 'Maintenance').reduce((sum, e) => sum + e.amount, 0);
-  const totalLiters = expenses.filter(e => e.type === 'Fuel').reduce((sum, e) => sum + e.liters, 0);
+  useEffect(() => {
+    if (openDialog) fetchDropdownData();
+  }, [openDialog]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSubmitting(true);
+      const uuid = crypto.randomUUID();
+      
+      if (formData.type === 'Fuel') {
+        const payload = {
+          id: uuid,
+          vehicle_id: formData.vehicle_id,
+          date: formData.date,
+          liters: formData.liters,
+          cost: formData.amount,
+          odometer_km: formData.odometer_km
+        };
+        await api.post('/fuel-logs/', payload);
+      } else {
+        const payload = {
+          id: uuid,
+          description: formData.description || 'Expense',
+          type: formData.type,
+          amount: formData.amount,
+          date: formData.date,
+          associated_with: formData.vehicle_id
+        };
+        await api.post('/expenses/', payload);
+      }
+      
+      toast.success('Record logged successfully');
+      setOpenDialog(false);
+      fetchData();
+      refreshDashboard();
+      setFormData({
+        vehicle_id: '',
+        type: 'Fuel',
+        amount: 0,
+        liters: 0,
+        odometer_km: 0,
+        description: '',
+        date: new Date().toISOString().split('T')[0]
+      });
+    } catch (error: any) {
+      let errorMsg = error.message;
+      if (error.response?.data?.detail) {
+        errorMsg = typeof error.response.data.detail === 'string' 
+          ? error.response.data.detail 
+          : JSON.stringify(error.response.data.detail);
+      }
+      toast.error('Failed to log record: ' + errorMsg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const totalExpenses = combinedExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const fuelExpenses = combinedExpenses.filter(e => e.type === 'Fuel').reduce((sum, e) => sum + Number(e.amount), 0);
+  const tollExpenses = combinedExpenses.filter(e => e.type === 'Toll').reduce((sum, e) => sum + Number(e.amount), 0);
+  const totalLiters = combinedExpenses.filter(e => e.type === 'Fuel').reduce((sum, e) => sum + Number(e.liters), 0);
+
+  if (loading) {
+    return (
+      <main className="flex-1 flex items-center justify-center overflow-auto p-6 bg-gradient-to-br from-background to-background/95">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </main>
+    );
+  }
 
   return (
     <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-background to-background/95">
@@ -79,7 +185,7 @@ export default function ExpensesPage() {
           </div>
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
             <DialogTrigger render={<Button />}>
-              <Plus className="size-4" />
+              <Plus className="size-4 mr-2" />
               Log Expense
             </DialogTrigger>
             <DialogContent>
@@ -87,55 +193,62 @@ export default function ExpensesPage() {
                 <DialogTitle>Log Expense</DialogTitle>
                 <DialogDescription>Record a new fuel or expense entry</DialogDescription>
               </DialogHeader>
-              <form className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Vehicle</label>
-                  <Select value={formData.vehicle} onValueChange={(v) => setFormData({ ...formData, vehicle: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select vehicle" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ABC-1234">ABC-1234</SelectItem>
-                      <SelectItem value="XYZ-5678">XYZ-5678</SelectItem>
-                      <SelectItem value="MNO-9012">MNO-9012</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <form className="space-y-4" onSubmit={handleSubmit}>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2 col-span-2">
+                    <label className="text-sm font-medium">Record Type</label>
+                    <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })} required>
+                      <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Fuel">Fuel</SelectItem>
+                        <SelectItem value="Toll">Toll</SelectItem>
+                        <SelectItem value="Maintenance">Maintenance</SelectItem>
+                        <SelectItem value="Insurance">Insurance</SelectItem>
+                        <SelectItem value="Salary">Salary</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <label className="text-sm font-medium">Vehicle ID</label>
+                    <Select value={formData.vehicle_id} onValueChange={v => setFormData({...formData, vehicle_id: v})} required>
+                      <SelectTrigger><SelectValue placeholder="Select Vehicle" /></SelectTrigger>
+                      <SelectContent>
+                        {availableVehicles.map(v => (
+                          <SelectItem key={v.id} value={v.id}>{v.registration} ({v.name})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Amount (₹)</label>
+                    <Input type="number" min="0" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })} required />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Date</label>
+                    <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} required />
+                  </div>
+                  {formData.type === 'Fuel' ? (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Liters</label>
+                        <Input type="number" min="0" value={formData.liters} onChange={(e) => setFormData({ ...formData, liters: Number(e.target.value) })} required />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Odometer (km)</label>
+                        <Input type="number" min="0" value={formData.odometer_km} onChange={(e) => setFormData({ ...formData, odometer_km: Number(e.target.value) })} required />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-2 col-span-2">
+                      <label className="text-sm font-medium">Description</label>
+                      <Input placeholder="Enter brief description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} required />
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Type</label>
-                  <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Fuel">Fuel</SelectItem>
-                      <SelectItem value="Maintenance">Maintenance</SelectItem>
-                      <SelectItem value="Toll">Toll</SelectItem>
-                      <SelectItem value="Parking">Parking</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Amount</label>
-                  <Input
-                    type="number"
-                    placeholder="0"
-                    value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Liters (if Fuel)</label>
-                  <Input
-                    type="number"
-                    placeholder="0"
-                    value={formData.liters}
-                    onChange={(e) => setFormData({ ...formData, liters: e.target.value })}
-                  />
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <Button variant="outline" onClick={() => setOpenDialog(false)}>Cancel</Button>
-                  <Button onClick={handleSubmit}>Log</Button>
+                <div className="flex gap-2 justify-end pt-4">
+                  <Button type="button" variant="outline" onClick={() => setOpenDialog(false)}>Cancel</Button>
+                  <Button type="submit" disabled={submitting}>{submitting ? 'Logging...' : 'Log Record'}</Button>
                 </div>
               </form>
             </DialogContent>
@@ -147,51 +260,28 @@ export default function ExpensesPage() {
           <Card className="border-border/50">
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Total Expenses</p>
-              <p className="text-2xl font-bold mt-2">${(totalExpenses / 1000).toFixed(1)}k</p>
+              <p className="text-2xl font-bold mt-2">₹{(totalExpenses / 1000).toFixed(1)}k</p>
             </CardContent>
           </Card>
           <Card className="border-border/50">
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Fuel Cost</p>
-              <p className="text-2xl font-bold mt-2">${(fuelExpenses / 1000).toFixed(1)}k</p>
+              <p className="text-2xl font-bold mt-2">₹{(fuelExpenses / 1000).toFixed(1)}k</p>
             </CardContent>
           </Card>
           <Card className="border-border/50">
             <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">Maintenance</p>
-              <p className="text-2xl font-bold mt-2">${(maintenanceExpenses / 1000).toFixed(1)}k</p>
+              <p className="text-sm text-muted-foreground">Tolls</p>
+              <p className="text-2xl font-bold mt-2">₹{(tollExpenses / 1000).toFixed(1)}k</p>
             </CardContent>
           </Card>
           <Card className="border-border/50">
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Total Fuel</p>
-              <p className="text-2xl font-bold mt-2">{totalLiters} L</p>
+              <p className="text-2xl font-bold mt-2">{totalLiters.toFixed(1)} L</p>
             </CardContent>
           </Card>
         </div>
-
-        {/* Monthly Expenses Chart */}
-        <Card className="border-border/50">
-          <CardHeader>
-            <CardTitle>Monthly Expenses Trend</CardTitle>
-            <CardDescription>Fuel, maintenance, and toll expenses by month</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="month" stroke="#888888" />
-                  <YAxis stroke="#888888" />
-                  <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} />
-                  <Bar dataKey="fuel" fill="#3b82f6" radius={[8, 8, 0, 0]} />
-                  <Bar dataKey="maintenance" fill="#f59e0b" radius={[8, 8, 0, 0]} />
-                  <Bar dataKey="tolls" fill="#10b981" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Expenses Table */}
         <Card className="border-border/50">
@@ -204,7 +294,7 @@ export default function ExpensesPage() {
             </div>
             <div className="flex gap-4 flex-col sm:flex-row">
               <Input
-                placeholder="Search by vehicle..."
+                placeholder="Search by vehicle ID..."
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
@@ -219,8 +309,9 @@ export default function ExpensesPage() {
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="Fuel">Fuel</SelectItem>
-                  <SelectItem value="Maintenance">Maintenance</SelectItem>
                   <SelectItem value="Toll">Toll</SelectItem>
+                  <SelectItem value="Parking">Parking</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -230,25 +321,26 @@ export default function ExpensesPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead>Vehicle</TableHead>
+                    <TableHead>Vehicle/Trip</TableHead>
                     <TableHead>Type</TableHead>
-                    <TableHead>Amount</TableHead>
+                    <TableHead>Amount (₹)</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Liters</TableHead>
-                    <TableHead>Cost/L</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedExpenses.map((expense) => (
                     <TableRow key={expense.id} className="hover:bg-muted/50">
-                      <TableCell className="font-medium">{expense.vehicle}</TableCell>
+                      <TableCell className="font-medium">{expense.vehicle_id || '-'}</TableCell>
                       <TableCell>
                         <Badge variant={expense.type === 'Fuel' ? 'default' : 'secondary'}>
                           {expense.type}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-semibold">${expense.amount}</TableCell>
-                      <TableCell className="text-sm">{expense.date}</TableCell>
+                      <TableCell className="font-semibold">₹{expense.amount}</TableCell>
+                      <TableCell className="text-sm">
+                         {expense.date ? new Date(expense.date).toLocaleDateString() : '-'}
+                      </TableCell>
                       <TableCell className="text-sm">
                         {expense.liters > 0 ? (
                           <div className="flex items-center gap-1">
@@ -259,23 +351,29 @@ export default function ExpensesPage() {
                           '-'
                         )}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {expense.costPerLiter > 0 ? `$${expense.costPerLiter}` : '-'}
-                      </TableCell>
                     </TableRow>
                   ))}
+                  {paginatedExpenses.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                        No expenses found.
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>
-            <div className="mt-4">
-              <TablePagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-                totalItems={filteredExpenses.length}
-                itemsPerPage={itemsPerPage}
-              />
-            </div>
+            {totalPages > 1 && (
+              <div className="mt-4">
+                <TablePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalItems={filteredExpenses.length}
+                  itemsPerPage={itemsPerPage}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
