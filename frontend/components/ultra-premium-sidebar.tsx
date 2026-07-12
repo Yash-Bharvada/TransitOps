@@ -21,6 +21,8 @@ import { useSidebar } from '@/components/sidebar-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useDashboard } from '@/components/dashboard-context'
 import { useAuth } from '@/components/auth-context'
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
+import { ChevronUp } from 'lucide-react'
 
 interface NavItem {
   title: string
@@ -78,7 +80,7 @@ export function UltraPremiumSidebar() {
   const pathname = usePathname()
   const { isOpen, isMobile, mounted, toggle, close } = useSidebar()
   const { dashboardData } = useDashboard()
-  const { logout } = useAuth()
+  const { user, logout } = useAuth()
 
   const activeTrips = dashboardData ? ((dashboardData.trips?.pending || 0) + (dashboardData.trips?.dispatched || 0)) : null;
   const pendingMaintenance = dashboardData?.maintenance?.pending;
@@ -125,8 +127,8 @@ export function UltraPremiumSidebar() {
         )}
       >
         {/* Header */}
-        <div className="p-6 border-b border-border flex items-center justify-between group">
-          <Link href="/" className="flex items-center gap-3 flex-1 min-w-0">
+        <div className={cn("flex items-center border-b border-border relative", effectiveIsOpen ? "p-6 justify-between" : "p-5 justify-center")}>
+          <Link href="/" className={cn("flex items-center gap-3 min-w-0", effectiveIsOpen ? "flex-1" : "")}>
             {/* Logo */}
             <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 via-accent-500 to-secondary-500 flex items-center justify-center shadow-glow-primary group-hover:shadow-glow-accent transition-all duration-300">
               <TruckIcon className="size-6 text-white" />
@@ -144,11 +146,14 @@ export function UltraPremiumSidebar() {
           {/* Toggle Button */}
           <button
             onClick={toggle}
-            className="hidden md:flex p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-300 text-muted-foreground hover:text-foreground ml-2"
+            className={cn(
+              "hidden md:flex items-center justify-center rounded-full bg-background border border-border shadow-sm hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-300 text-muted-foreground hover:text-foreground absolute z-50",
+              effectiveIsOpen ? "right-4 top-1/2 -translate-y-1/2 w-8 h-8" : "-right-3.5 top-1/2 -translate-y-1/2 w-7 h-7"
+            )}
           >
             <ChevronRight
               className={cn(
-                'size-5 transition-transform duration-500',
+                'size-4 transition-transform duration-500',
                 !effectiveIsOpen && 'rotate-180'
               )}
             />
@@ -243,38 +248,64 @@ export function UltraPremiumSidebar() {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-border space-y-4">
-          <ThemeToggle isOpen={effectiveIsOpen} />
-          
+        <div className="p-4 border-t border-border flex flex-col gap-4">
           {effectiveIsOpen ? (
-            <div className="animate-fade-in-scale">
-              <button 
-                onClick={logout}
-                className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-red-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors mb-4"
-              >
-                <LogOutIcon className="size-4" />
-                <span>Sign Out</span>
-              </button>
-
-              <p className="text-muted-foreground text-xs font-bold tracking-widest mb-2">
-                STATUS
-              </p>
-              <div className="flex items-center gap-2 text-foreground text-xs">
-                <div className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
-                <span>System Operational</span>
+            <div className="animate-fade-in-scale w-full space-y-4">
+              {/* Status & Version */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-foreground text-xs">
+                  <div className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
+                  <span>System Operational</span>
+                </div>
+                <span className="text-muted-foreground/60 text-xs font-mono">v1.0.0</span>
               </div>
-              <p className="text-muted-foreground/60 text-xs mt-2">v2.4.1</p>
+
+              {/* Profile Drawer */}
+              <Collapsible>
+                <CollapsibleTrigger className="w-full flex items-center justify-between p-2.5 bg-black/5 dark:bg-white/5 rounded-xl border border-border hover:bg-black/10 dark:hover:bg-white/10 transition-colors group/profile">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-white font-bold shrink-0 shadow-sm">
+                      {user?.full_name?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                    <div className="flex flex-col text-left min-w-0 flex-1">
+                      <span className="text-sm font-bold truncate text-foreground leading-none mb-1">{user?.full_name || 'User'}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-primary leading-none">{user?.role || 'Role'}</span>
+                    </div>
+                  </div>
+                  <ChevronUp className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]/profile:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-2 mt-2 px-1">
+                  <div className="pt-2 pb-1 border-t border-border/50">
+                    <ThemeToggle isOpen={effectiveIsOpen} />
+                  </div>
+                  <button 
+                    onClick={logout}
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-red-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                  >
+                    <LogOutIcon className="size-4" />
+                    <span>Sign Out</span>
+                  </button>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-4">
-              <button 
-                onClick={logout}
-                className="p-2 text-red-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                title="Sign Out"
-              >
-                <LogOutIcon className="size-5" />
-              </button>
-              <div className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
+              <Collapsible>
+                <CollapsibleTrigger className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-white font-bold shrink-0 shadow-sm focus:outline-none" title={user?.full_name}>
+                  {user?.full_name?.charAt(0).toUpperCase() || 'U'}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="flex flex-col items-center gap-3 mt-4 pt-4 border-t border-border/50">
+                  <ThemeToggle isOpen={effectiveIsOpen} />
+                  <button 
+                    onClick={logout}
+                    className="p-2 text-red-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                    title="Sign Out"
+                  >
+                    <LogOutIcon className="size-5" />
+                  </button>
+                </CollapsibleContent>
+              </Collapsible>
+              <div className="w-2 h-2 rounded-full bg-success-500 animate-pulse mt-2" title="System Operational" />
             </div>
           )}
         </div>

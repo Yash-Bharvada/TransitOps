@@ -92,7 +92,10 @@ export default function Signup() {
       <div className="w-full max-w-md">
         <Card className="border-border shadow-2xl bg-card pb-0">
           <CardHeader className="flex flex-col items-center space-y-1.5 pb-4 pt-6">
-            <Logo className="w-12 h-12 text-primary" />
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <Logo className="w-10 h-10 text-primary" />
+              <span className="text-3xl font-bold tracking-tight text-foreground">TransitOps</span>
+            </div>
             <div className="space-y-0.5 flex flex-col items-center">
               <h2 className="text-2xl font-semibold text-foreground">
                 Create an account
