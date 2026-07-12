@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { usePathname } from 'next/navigation'
 
 interface SidebarContextValue {
   isOpen: boolean
@@ -55,12 +56,20 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   )
 }
 
-/** Wrapper for the main content area — shifts right based on sidebar state */
 export function SidebarContentWrapper({ children }: { children: ReactNode }) {
   const { isOpen, mounted } = useSidebar()
+  const pathname = usePathname()
 
   // Use stable SSR default (sidebar open = ml-72) to avoid hydration mismatch
   const effectiveIsOpen = mounted ? isOpen : true
+
+  if (pathname === '/login' || pathname === '/signup') {
+    return (
+      <main className="flex-1 min-w-0 h-screen overflow-y-auto no-scrollbar">
+        {children}
+      </main>
+    )
+  }
 
   return (
     <main

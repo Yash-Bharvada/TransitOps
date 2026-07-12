@@ -3,19 +3,25 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { TablePagination } from '@/components/table-pagination';
-import { Plus, Wrench, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { Plus, Wrench, AlertCircle, CheckCircle, Loader2, Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import { useAuth } from '@/components/auth-context';
+import { ProtectedRoute } from '@/components/protected-route';
 import { useDashboard } from '@/components/dashboard-context';
 
 export default function MaintenancePage() {
+  const { user } = useAuth();
+  const canEdit = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'driver';
+
   const [records, setRecords] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -150,6 +156,7 @@ export default function MaintenancePage() {
   }
 
   return (
+    <ProtectedRoute requiredRoles={['admin', 'manager', 'driver', 'viewer']}>
     <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-background to-background/95">
       <div className="space-y-6">
         {/* Header */}
@@ -158,12 +165,13 @@ export default function MaintenancePage() {
             <h1 className="text-3xl font-bold text-foreground">Maintenance</h1>
             <p className="text-sm text-muted-foreground mt-1">Schedule and track vehicle maintenance</p>
           </div>
-          <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-            <DialogTrigger render={<Button />}>
-              <Plus className="size-4 mr-2" />
-              Schedule Maintenance
-            </DialogTrigger>
-            <DialogContent>
+          {canEdit && (
+            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+              <DialogTrigger className={buttonVariants({ variant: 'default' })}>
+                <Plus className="size-4 mr-2" />
+                Schedule Maintenance
+              </DialogTrigger>
+              <DialogContent>
               <DialogHeader>
                 <DialogTitle>Schedule Maintenance</DialogTitle>
                 <DialogDescription>Schedule new maintenance for a vehicle</DialogDescription>
@@ -172,7 +180,7 @@ export default function MaintenancePage() {
                 <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Vehicle</label>
-                    <Select value={formData.vehicle_id} onValueChange={v => setFormData({...formData, vehicle_id: v})} required>
+                    <Select value={formData.vehicle_id} onValueChange={(v) => setFormData({...formData, vehicle_id: v as string})} required>
                       <SelectTrigger><SelectValue placeholder="Select Vehicle" /></SelectTrigger>
                       <SelectContent>
                         {availableVehicles.map(v => (
@@ -201,6 +209,7 @@ export default function MaintenancePage() {
               </form>
             </DialogContent>
           </Dialog>
+          )}
         </div>
 
         {/* Statistics */}
@@ -250,7 +259,7 @@ export default function MaintenancePage() {
                 }}
                 className="flex-1"
               />
-              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}>
+              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as string); setCurrentPage(1); }}>
                 <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
@@ -274,6 +283,7 @@ export default function MaintenancePage() {
                     <TableHead>Start Date</TableHead>
                     <TableHead>End Date</TableHead>
                     <TableHead>Cost (₹)</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -304,11 +314,35 @@ export default function MaintenancePage() {
                         {record.end_date ? new Date(record.end_date).toLocaleDateString() : '-'}
                       </TableCell>
                       <TableCell className="font-semibold">₹{record.cost || 0}</TableCell>
+                      <TableCell>
+                        {canEdit && (
+                          <ConfirmDialog
+                            trigger={
+                              <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10">
+                                <Trash2 className="size-4" />
+                              </Button>
+                            }
+                            title="Delete Record"
+                            description="Are you sure you want to delete this maintenance record?"
+                            onConfirm={async () => {
+                              try {
+                                await api.delete(`/maintenance/${record.id}`);
+                                toast.success('Record deleted');
+                                fetchData();
+                                refreshDashboard();
+                              } catch (e: any) {
+                                toast.error('Failed to delete: ' + (e.response?.data?.detail || e.message));
+                              }
+                            }}
+                            confirmText="Delete"
+                          />
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                   {paginatedRecords.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
                         No maintenance records found.
                       </TableCell>
                     </TableRow>
@@ -331,5 +365,6 @@ export default function MaintenancePage() {
         </Card>
       </div>
     </main>
+    </ProtectedRoute>
   );
 }

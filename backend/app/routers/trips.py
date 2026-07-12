@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import date
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_role
+from app.models.user import User
 from app.schemas.trip import TripCreate, TripUpdate, TripResponse, TripStats
 from app.schemas import PaginatedResponse, SuccessResponse
 from app.crud.trip import trip as crud_trip
@@ -49,7 +50,7 @@ def read_trips(
 def create_trip(
     trip_in: TripCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(require_role(["admin", "manager", "driver"]))
 ):
     # Validate vehicle
     vehicle = crud_vehicle.get(db, id=trip_in.vehicle_id)
@@ -90,7 +91,7 @@ def read_trip(id: str, db: Session = Depends(get_db), current_user: dict = Depen
 @router.patch("/{id}", response_model=SuccessResponse[TripResponse])
 def update_trip(
     id: str, trip_in: TripUpdate, 
-    db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
+    db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "manager", "driver"]))
 ):
     trip = crud_trip.get(db, id=id)
     if not trip:
@@ -102,7 +103,7 @@ def update_trip(
     return {"status": "success", "data": updated_trip, "message": "Trip updated successfully"}
 
 @router.delete("/{id}", response_model=SuccessResponse[TripResponse])
-def delete_trip(id: str, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def delete_trip(id: str, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "manager", "driver"]))):
     trip = crud_trip.get(db, id=id)
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")

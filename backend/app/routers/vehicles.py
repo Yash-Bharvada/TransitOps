@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_role
+from app.models.user import User
 from app.schemas.vehicle import VehicleCreate, VehicleUpdate, VehicleResponse, VehicleStats
 from app.schemas import PaginatedResponse, SuccessResponse
 from app.crud.vehicle import vehicle as crud_vehicle
@@ -42,7 +43,7 @@ def read_vehicles(
 def create_vehicle(
     vehicle_in: VehicleCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(require_role(["admin", "manager", "driver"]))
 ):
     vehicle = crud_vehicle.get_by_registration(db, registration=vehicle_in.registration)
     if vehicle:
@@ -66,7 +67,7 @@ def read_vehicle(id: str, db: Session = Depends(get_db), current_user: dict = De
 @router.patch("/{id}", response_model=SuccessResponse[VehicleResponse])
 def update_vehicle(
     id: str, vehicle_in: VehicleUpdate, 
-    db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
+    db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "manager", "driver"]))
 ):
     vehicle = crud_vehicle.get(db, id=id)
     if not vehicle:
@@ -76,7 +77,7 @@ def update_vehicle(
     return {"status": "success", "data": updated_vehicle, "message": "Vehicle updated successfully"}
 
 @router.delete("/{id}", response_model=SuccessResponse[VehicleResponse])
-def delete_vehicle(id: str, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def delete_vehicle(id: str, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "manager", "driver"]))):
     vehicle = crud_vehicle.get(db, id=id)
     if not vehicle:
         raise HTTPException(status_code=404, detail="Vehicle not found")

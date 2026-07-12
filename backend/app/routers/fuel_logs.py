@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import date
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_role
+from app.models.user import User
 from app.schemas.fuel_log import FuelLogCreate, FuelLogResponse
 from app.schemas import PaginatedResponse, SuccessResponse
 from app.crud.fuel_log import fuel_log as crud_fuel_log
@@ -41,7 +42,7 @@ def read_fuel_logs(
 def create_fuel_log(
     log_in: FuelLogCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(require_role(["admin", "manager", "driver"]))
 ):
     vehicle = crud_vehicle.get(db, id=log_in.vehicle_id)
     if not vehicle:

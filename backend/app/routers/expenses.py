@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import date
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_role
+from app.models.user import User
 from app.schemas.expense import ExpenseCreate, ExpenseResponse
 from app.schemas import PaginatedResponse, SuccessResponse
 from app.crud.expense import expense as crud_expense
@@ -43,7 +44,7 @@ def read_expenses(
 def create_expense(
     expense_in: ExpenseCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(require_role(["admin", "manager", "driver"]))
 ):
     new_expense = crud_expense.create(db, obj_in=expense_in)
     return {"status": "success", "data": new_expense, "message": "Expense created successfully"}

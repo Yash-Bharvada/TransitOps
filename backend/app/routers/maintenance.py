@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_role
+from app.models.user import User
 from app.schemas.maintenance import MaintenanceCreate, MaintenanceUpdate, MaintenanceResponse, MaintenanceStats
 from app.schemas import PaginatedResponse, SuccessResponse
 from app.crud.maintenance import maintenance as crud_maintenance
@@ -41,7 +42,7 @@ def read_maintenance(
 def create_maintenance(
     maint_in: MaintenanceCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(require_role(["admin", "manager", "driver"]))
 ):
     vehicle = crud_vehicle.get(db, id=maint_in.vehicle_id)
     if not vehicle:
@@ -68,7 +69,7 @@ def read_maintenance_record(id: str, db: Session = Depends(get_db), current_user
 @router.patch("/{id}", response_model=SuccessResponse[MaintenanceResponse])
 def update_maintenance(
     id: str, maint_in: MaintenanceUpdate, 
-    db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
+    db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "manager", "driver"]))
 ):
     maint = crud_maintenance.get(db, id=id)
     if not maint:
@@ -80,7 +81,7 @@ def update_maintenance(
     return {"status": "success", "data": updated_maint, "message": "Maintenance updated successfully"}
 
 @router.delete("/{id}", response_model=SuccessResponse[MaintenanceResponse])
-def delete_maintenance(id: str, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def delete_maintenance(id: str, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "manager", "driver"]))):
     maint = crud_maintenance.get(db, id=id)
     if not maint:
         raise HTTPException(status_code=404, detail="Maintenance record not found")

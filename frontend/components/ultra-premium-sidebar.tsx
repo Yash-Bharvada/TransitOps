@@ -14,11 +14,13 @@ import {
   Menu,
   X,
   ChevronRight,
+  LogOutIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSidebar } from '@/components/sidebar-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useDashboard } from '@/components/dashboard-context'
+import { useAuth } from '@/components/auth-context'
 
 interface NavItem {
   title: string
@@ -76,6 +78,7 @@ export function UltraPremiumSidebar() {
   const pathname = usePathname()
   const { isOpen, isMobile, mounted, toggle, close } = useSidebar()
   const { dashboardData } = useDashboard()
+  const { logout } = useAuth()
 
   const activeTrips = dashboardData ? ((dashboardData.trips?.pending || 0) + (dashboardData.trips?.dispatched || 0)) : null;
   const pendingMaintenance = dashboardData?.maintenance?.pending;
@@ -83,6 +86,10 @@ export function UltraPremiumSidebar() {
   // Use stable SSR-safe defaults before mount to prevent hydration mismatch
   const effectiveIsOpen = mounted ? isOpen : true
   const effectiveIsMobile = mounted ? isMobile : false
+
+  if (pathname === '/login' || pathname === '/signup') {
+    return null;
+  }
 
   return (
     <>
@@ -241,6 +248,14 @@ export function UltraPremiumSidebar() {
           
           {effectiveIsOpen ? (
             <div className="animate-fade-in-scale">
+              <button 
+                onClick={logout}
+                className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-red-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors mb-4"
+              >
+                <LogOutIcon className="size-4" />
+                <span>Sign Out</span>
+              </button>
+
               <p className="text-muted-foreground text-xs font-bold tracking-widest mb-2">
                 STATUS
               </p>
@@ -251,7 +266,14 @@ export function UltraPremiumSidebar() {
               <p className="text-muted-foreground/60 text-xs mt-2">v2.4.1</p>
             </div>
           ) : (
-            <div className="flex justify-center">
+            <div className="flex flex-col items-center gap-4">
+              <button 
+                onClick={logout}
+                className="p-2 text-red-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                title="Sign Out"
+              >
+                <LogOutIcon className="size-5" />
+              </button>
               <div className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
             </div>
           )}

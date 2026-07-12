@@ -3,18 +3,24 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { TablePagination } from '@/components/table-pagination';
-import { Plus, Star, Award, TrendingUp, Loader2 } from 'lucide-react';
+import { Plus, ShieldAlert, CheckCircle, Clock, Loader2, Trash2, Star } from 'lucide-react';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import { useAuth } from '@/components/auth-context';
+import { ProtectedRoute } from '@/components/protected-route';
 import { useDashboard } from '@/components/dashboard-context';
 
 export default function DriversPage() {
+  const { user } = useAuth();
+  const canEdit = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'driver';
+
   const [drivers, setDrivers] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -131,61 +137,64 @@ export default function DriversPage() {
   }
 
   return (
+    <ProtectedRoute requiredRoles={['admin', 'manager', 'driver', 'viewer']}>
     <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-background to-background/95">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Drivers</h1>
-            <p className="text-sm text-muted-foreground mt-1">Manage driver information and performance</p>
+            <p className="text-sm text-muted-foreground mt-1">Manage driver profiles and performance</p>
           </div>
-          <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-            <DialogTrigger render={<Button />}>
-              <Plus className="size-4 mr-2" />
-              Add Driver
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Driver</DialogTitle>
-                <DialogDescription>Register a new driver to your fleet</DialogDescription>
-              </DialogHeader>
-              <form className="space-y-4" onSubmit={handleSubmit}>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2 col-span-2">
-                    <label className="text-sm font-medium">Name</label>
-                    <Input placeholder="John Doe" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
+          {canEdit && (
+            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+              <DialogTrigger className={buttonVariants({ variant: 'default' })}>
+                <Plus className="size-4 mr-2" />
+                Add Driver
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Driver</DialogTitle>
+                  <DialogDescription>Register a new driver to your fleet</DialogDescription>
+                </DialogHeader>
+                <form className="space-y-4" onSubmit={handleSubmit}>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2 col-span-2">
+                      <label className="text-sm font-medium">Name</label>
+                      <Input placeholder="John Doe" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">License Number</label>
+                      <Input placeholder="MH01-2023-1234567" value={formData.license_number} onChange={e => setFormData({...formData, license_number: e.target.value})} required />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">License Category</label>
+                      <Select value={formData.license_category} onValueChange={(v) => setFormData({...formData, license_category: v as string})}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Class A">Class A</SelectItem>
+                          <SelectItem value="Class B">Class B</SelectItem>
+                          <SelectItem value="Class C">Class C</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">License Expiry</label>
+                      <Input type="date" value={formData.license_expiry} onChange={e => setFormData({...formData, license_expiry: e.target.value})} required />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Contact Number</label>
+                      <Input type="tel" placeholder="+91 9876543210" value={formData.contact} onChange={e => setFormData({...formData, contact: e.target.value})} required />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">License Number</label>
-                    <Input placeholder="MH01-2023-1234567" value={formData.license_number} onChange={e => setFormData({...formData, license_number: e.target.value})} required />
+                  <div className="flex gap-2 justify-end pt-4">
+                    <Button type="button" variant="outline" onClick={() => setOpenDialog(false)}>Cancel</Button>
+                    <Button type="submit" disabled={submitting}>{submitting ? 'Adding...' : 'Add Driver'}</Button>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">License Category</label>
-                    <Select value={formData.license_category} onValueChange={v => setFormData({...formData, license_category: v})}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Class A">Class A</SelectItem>
-                        <SelectItem value="Class B">Class B</SelectItem>
-                        <SelectItem value="Class C">Class C</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">License Expiry</label>
-                    <Input type="date" value={formData.license_expiry} onChange={e => setFormData({...formData, license_expiry: e.target.value})} required />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Contact Number</label>
-                    <Input type="tel" placeholder="+91 9876543210" value={formData.contact} onChange={e => setFormData({...formData, contact: e.target.value})} required />
-                  </div>
-                </div>
-                <div className="flex gap-2 justify-end pt-4">
-                  <Button type="button" variant="outline" onClick={() => setOpenDialog(false)}>Cancel</Button>
-                  <Button type="submit" disabled={submitting}>{submitting ? 'Adding...' : 'Add Driver'}</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         {/* Statistics */}
@@ -237,9 +246,9 @@ export default function DriversPage() {
                 }}
                 className="flex-1"
               />
-              <Select value={licenseFilter} onValueChange={(v) => { setLicenseFilter(v); setCurrentPage(1); }}>
+              <Select value={licenseFilter} onValueChange={(v) => { setLicenseFilter(v as string); setCurrentPage(1); }}>
                 <SelectTrigger className="w-40">
-                  <SelectValue />
+                  <SelectValue placeholder="Category" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
@@ -261,7 +270,7 @@ export default function DriversPage() {
                     <TableHead>Contact</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Safety Score</TableHead>
-                    <TableHead>Expiry</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -284,14 +293,58 @@ export default function DriversPage() {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {driver.license_expiry ? new Date(driver.license_expiry).toLocaleDateString() : '-'}
+                      <TableCell>
+                        {canEdit && (
+                          <ConfirmDialog
+                            trigger={
+                              <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50">
+                                <ShieldAlert className="size-4" />
+                              </Button>
+                            }
+                            title="Report Incident"
+                            description={`Log an incident for driver ${driver.name}?`}
+                            onConfirm={async () => {
+                              try {
+                                const newScore = Math.max(0, (driver.safety_score || 100) - 10);
+                                await api.patch(`/drivers/${driver.id}`, { safety_score: newScore });
+                                toast.success(`Incident reported for ${driver.name}. Safety score reduced to ${newScore}.`);
+                                fetchData();
+                                refreshDashboard();
+                              } catch (e: any) {
+                                toast.error('Failed to report incident: ' + (e.response?.data?.detail || e.message));
+                              }
+                            }}
+                            confirmText="Report"
+                          />
+                        )}
+                        {canEdit && (
+                          <ConfirmDialog
+                            trigger={
+                              <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10">
+                                <Trash2 className="size-4" />
+                              </Button>
+                            }
+                            title="Delete Driver"
+                            description={`Are you sure you want to delete ${driver.name}?`}
+                            onConfirm={async () => {
+                              try {
+                                await api.delete(`/drivers/${driver.id}`);
+                                toast.success('Driver deleted');
+                                fetchData();
+                                refreshDashboard();
+                              } catch (e: any) {
+                                toast.error('Failed to delete: ' + (e.response?.data?.detail || e.message));
+                              }
+                            }}
+                            confirmText="Delete"
+                          />
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
                   {paginatedDrivers.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
                         No drivers found.
                       </TableCell>
                     </TableRow>
@@ -314,5 +367,6 @@ export default function DriversPage() {
         </Card>
       </div>
     </main>
+    </ProtectedRoute>
   );
 }

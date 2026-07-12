@@ -12,6 +12,8 @@ import { StatusBadge } from '@/components/status-badge';
 import { TablePagination } from '@/components/table-pagination';
 import { PremiumKPICard } from '@/components/premium-kpi-card';
 import { TrendingUp, Fuel, AlertTriangle, MapPin, Activity, Loader2 } from 'lucide-react';
+import { ProtectedRoute } from '@/components/protected-route';
+import { useAuth } from '@/components/auth-context';
 import api from '@/lib/api';
 
 const weeklyData = [
@@ -33,12 +35,20 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+  const { token, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (!authLoading) {
+      if (token) {
+        fetchData();
+      } else {
+        setLoading(false);
+      }
+    }
+  }, [token, authLoading]);
 
   const fetchData = async () => {
+    if (!token) return;
     try {
       setLoading(true);
       const [dashRes, vehRes] = await Promise.all([
@@ -103,6 +113,7 @@ export default function Dashboard() {
   }
 
   return (
+    <ProtectedRoute requiredRoles={['admin', 'manager', 'driver', 'viewer']}>
     <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-background to-background/95">
       <div className="space-y-6">
         {/* Header */}
@@ -158,7 +169,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <ComposedChart data={weeklyData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                     <XAxis dataKey="date" stroke="#888888" tickLine={false} />
@@ -182,7 +193,7 @@ export default function Dashboard() {
             <CardContent>
               <div className="h-72">
                 {statusDistribution.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <PieChart>
                       <Pie
                         data={statusDistribution}
@@ -229,7 +240,7 @@ export default function Dashboard() {
                 }}
                 className="flex-1"
               />
-              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}>
+              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as string); setCurrentPage(1); }}>
                 <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
@@ -259,7 +270,7 @@ export default function Dashboard() {
                       <TableCell className="font-medium">{vehicle.registration}</TableCell>
                       <TableCell>{vehicle.name}</TableCell>
                       <TableCell>
-                        <StatusBadge status={vehicle.status?.toLowerCase().replace(' ', '_')} />
+                        <StatusBadge status={vehicle.status || 'Unknown'} />
                       </TableCell>
                       <TableCell>{vehicle.region}</TableCell>
                     </TableRow>
@@ -289,5 +300,6 @@ export default function Dashboard() {
         </Card>
       </div>
     </main>
+    </ProtectedRoute>
   );
 }

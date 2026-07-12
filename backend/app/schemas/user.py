@@ -35,3 +35,11 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     user_id: Optional[str] = None
+
+class AuthResponseData(BaseModel):
+    token: str
+    user: UserResponse
+
+class AuthResponse(BaseModel):
+    data: AuthResponseData
+    message: str = "Success"

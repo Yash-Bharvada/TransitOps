@@ -3,18 +3,24 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { TablePagination } from '@/components/table-pagination';
-import { Plus, TrendingUp, DollarSign, Fuel, Loader2 } from 'lucide-react';
+import { Plus, TrendingUp, DollarSign, Fuel, Loader2, Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import { useAuth } from '@/components/auth-context';
+import { ProtectedRoute } from '@/components/protected-route';
 import { useDashboard } from '@/components/dashboard-context';
 
 export default function ExpensesPage() {
+  const { user } = useAuth();
+  const canEdit = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'driver';
+
   const [combinedExpenses, setCombinedExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -52,6 +58,7 @@ export default function ExpensesPage() {
       
       const normalizedExpenses = expRes.data.data.map((e: any) => ({
         id: `exp-${e.id}`,
+        dbId: e.id,
         vehicle_id: e.associated_with,
         type: e.type,
         amount: e.amount,
@@ -61,6 +68,7 @@ export default function ExpensesPage() {
 
       const normalizedFuel = fuelRes.data.data.map((f: any) => ({
         id: `fuel-${f.id}`,
+        dbId: f.id,
         vehicle_id: f.vehicle_id,
         type: 'Fuel',
         amount: f.cost,
@@ -175,6 +183,7 @@ export default function ExpensesPage() {
   }
 
   return (
+    <ProtectedRoute requiredRoles={['admin', 'manager', 'driver', 'viewer']}>
     <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-background to-background/95">
       <div className="space-y-6">
         {/* Header */}
@@ -183,12 +192,13 @@ export default function ExpensesPage() {
             <h1 className="text-3xl font-bold text-foreground">Fuel & Expenses</h1>
             <p className="text-sm text-muted-foreground mt-1">Track fuel consumption and operational costs</p>
           </div>
-          <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-            <DialogTrigger render={<Button />}>
-              <Plus className="size-4 mr-2" />
-              Log Expense
-            </DialogTrigger>
-            <DialogContent>
+          {canEdit && (
+            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+              <DialogTrigger className={buttonVariants({ variant: 'default' })}>
+                <Plus className="size-4 mr-2" />
+                Log Expense
+              </DialogTrigger>
+              <DialogContent>
               <DialogHeader>
                 <DialogTitle>Log Expense</DialogTitle>
                 <DialogDescription>Record a new fuel or expense entry</DialogDescription>
@@ -197,7 +207,7 @@ export default function ExpensesPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2 col-span-2">
                     <label className="text-sm font-medium">Record Type</label>
-                    <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })} required>
+                    <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v as string })} required>
                       <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Fuel">Fuel</SelectItem>
@@ -211,7 +221,7 @@ export default function ExpensesPage() {
                   </div>
                   <div className="space-y-2 col-span-2">
                     <label className="text-sm font-medium">Vehicle ID</label>
-                    <Select value={formData.vehicle_id} onValueChange={v => setFormData({...formData, vehicle_id: v})} required>
+                    <Select value={formData.vehicle_id} onValueChange={(v) => setFormData({...formData, vehicle_id: v as string})} required>
                       <SelectTrigger><SelectValue placeholder="Select Vehicle" /></SelectTrigger>
                       <SelectContent>
                         {availableVehicles.map(v => (
@@ -246,13 +256,14 @@ export default function ExpensesPage() {
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2 justify-end pt-4">
-                  <Button type="button" variant="outline" onClick={() => setOpenDialog(false)}>Cancel</Button>
-                  <Button type="submit" disabled={submitting}>{submitting ? 'Logging...' : 'Log Record'}</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <div className="flex gap-2 justify-end pt-4">
+                    <Button type="button" variant="outline" onClick={() => setOpenDialog(false)}>Cancel</Button>
+                    <Button type="submit" disabled={submitting}>{submitting ? 'Logging...' : 'Log Record'}</Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         {/* Statistics */}
@@ -302,7 +313,7 @@ export default function ExpensesPage() {
                 }}
                 className="flex-1"
               />
-              <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setCurrentPage(1); }}>
+              <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v as string); setCurrentPage(1); }}>
                 <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
@@ -326,6 +337,7 @@ export default function ExpensesPage() {
                     <TableHead>Amount (₹)</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Liters</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -337,7 +349,7 @@ export default function ExpensesPage() {
                           {expense.type}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-semibold">₹{expense.amount}</TableCell>
+                      <TableCell className="font-semibold">₹{expense.amount || 0}</TableCell>
                       <TableCell className="text-sm">
                          {expense.date ? new Date(expense.date).toLocaleDateString() : '-'}
                       </TableCell>
@@ -351,11 +363,36 @@ export default function ExpensesPage() {
                           '-'
                         )}
                       </TableCell>
+                      <TableCell>
+                        {canEdit && (
+                          <ConfirmDialog
+                            trigger={
+                              <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10">
+                                <Trash2 className="size-4" />
+                              </Button>
+                            }
+                            title="Delete Expense"
+                            description="Are you sure you want to delete this expense record?"
+                            onConfirm={async () => {
+                              try {
+                                const endpoint = expense.id.startsWith('fuel-') ? `/fuel-logs/${expense.dbId}` : `/expenses/${expense.dbId}`;
+                                await api.delete(endpoint);
+                                toast.success('Expense deleted');
+                                fetchData();
+                                refreshDashboard();
+                              } catch (e: any) {
+                                toast.error('Failed to delete: ' + (e.response?.data?.detail || e.message));
+                              }
+                            }}
+                            confirmText="Delete"
+                          />
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                   {paginatedExpenses.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
                         No expenses found.
                       </TableCell>
                     </TableRow>
@@ -378,5 +415,6 @@ export default function ExpensesPage() {
         </Card>
       </div>
     </main>
+    </ProtectedRoute>
   );
 }
